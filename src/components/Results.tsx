@@ -149,7 +149,10 @@ export default function Results({ scheme }: { scheme: DesignScheme }) {
             <section className="panel">
               <header className="panel-head">
                 <h4>Typography</h4>
-                <span>{scheme.fonts.length} families</span>
+                <span>
+                  {new Set(scheme.fonts.map((font) => font.family)).size}{' '}
+                  {new Set(scheme.fonts.map((font) => font.family)).size === 1 ? 'family' : 'families'}
+                </span>
               </header>
               <div className="type-specimen" style={{ fontFamily: `"${displayFont}", system-ui, sans-serif` }}>
                 <span className="specimen-glyph">Aa</span>
