@@ -14,13 +14,7 @@ export function SkyBackdrop() {
             <stop offset="0" stopColor="#ffffff" stopOpacity="0" />
             <stop offset="1" stopColor="#f2f9ff" stopOpacity="0.96" />
           </linearGradient>
-          <linearGradient id="sunGlow" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0" stopColor="#ffffff" stopOpacity="0.55" />
-            <stop offset="1" stopColor="#ffffff" stopOpacity="0" />
-          </linearGradient>
         </defs>
-
-        <ellipse cx="1050" cy="90" rx="520" ry="260" fill="url(#sunGlow)" />
 
         <g fill="#ffffff" filter="url(#cloudBlur)">
           <Cloud x={120} y={520} scale={1.35} opacity={0.72} />

@@ -237,7 +237,7 @@ ol {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: 152px 0 108px;
+  padding: 148px 0 92px;
   background: #bcd9fb;
 }
 
@@ -256,10 +256,11 @@ ol {
     #4585e7 16%,
     #63a0f0 34%,
     #8fbdf5 52%,
-    #bddbfa 66%,
-    #e2f0fe 79%,
-    #f6fbff 90%,
-    #ffffff 100%
+    #b7d7fa 68%,
+    #d6eafd 80%,
+    #eaf5ff 89%,
+    #f6faff 96%,
+    #f6faff 100%
   );
 }
 
@@ -273,8 +274,8 @@ ol {
 .sky-fade {
   position: absolute;
   inset: auto 0 0;
-  height: 130px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0), #f6faff 78%);
+  height: 76px;
+  background: linear-gradient(180deg, rgba(246, 250, 255, 0), #f6faff 86%);
 }
 
 .hero-inner {
@@ -302,8 +303,8 @@ ol {
 
 .hero-title {
   margin-top: 22px;
-  max-width: 1000px;
-  font-size: clamp(2.55rem, 6.2vw, 4.7rem);
+  max-width: 1040px;
+  font-size: clamp(2.4rem, 4.95vw, 4.05rem);
   line-height: 1.04;
   letter-spacing: -0.045em;
   font-weight: 600;
@@ -389,8 +390,8 @@ ol {
 
 .example-chip {
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  background: rgba(255, 255, 255, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.36);
+  background: rgba(255, 255, 255, 0.2);
   color: #fff;
   font-size: 12.5px;
   padding: 6px 12px;
@@ -408,16 +409,21 @@ ol {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 10px 26px;
-  margin-top: 30px;
-  font-size: 13.5px;
-  color: rgba(255, 255, 255, 0.93);
+  gap: 8px;
+  margin-top: 26px;
+  font-size: 13px;
+  color: #f2f8ff;
 }
 
 .trust-row li {
   display: inline-flex;
   align-items: center;
   gap: 7px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(23, 58, 130, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.26);
+  backdrop-filter: blur(6px);
 }
 
 .trust-row svg {
