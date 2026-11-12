@@ -5,3 +5,7 @@ dist
 ref/
 pythe.html
 pythe.css
+.dev.log
+.dev.pid
+.prod.log
+.prod.pid
