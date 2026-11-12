@@ -297,6 +297,15 @@ function topValues(counts, property, max = 8) {
   return found.sort((a, b) => b.count - a.count).slice(0, max);
 }
 
+function sanitizeWeight(value, fallback) {
+  const input = String(value ?? '').trim();
+  const numeric = input.match(/\b([1-9]00)\b/);
+  if (numeric) return numeric[1];
+  if (/bold/i.test(input)) return '700';
+  if (/medium|semibold|demibold/i.test(input)) return '600';
+  return fallback;
+}
+
 function toPx(value) {
   const input = String(value ?? '').trim().toLowerCase();
   const clamp = input.match(/^clamp\(([^)]+)\)$/);
@@ -403,6 +412,26 @@ export async function analyzeUrl(input) {
   const rules = parseRules(css);
   const declarations = collectDeclarations(css);
 
+  /* colour hints: brand variables and button fills beat raw frequency */
+  const colorBoost = new Map();
+  const bump = (raw, weight) => {
+    const value = normalizeSpace(String(raw ?? ''));
+    const triple = value.match(/^-?\d+(?:\.\d+)?\s+\d+(?:\.\d+)?%\s+\d+(?:\.\d+)?%$/);
+    const parsed = parseColor(triple ? `hsl(${value})` : value);
+    if (!parsed || parsed.a < 0.5) return;
+    const hex = toHex(parsed);
+    colorBoost.set(hex, (colorBoost.get(hex) ?? 0) + weight);
+  };
+  const brandVariable = /--[a-z0-9-]*(brand|primary|accent)[a-z0-9-]*\s*:\s*([^;}]+)/gi;
+  let brandMatch;
+  while ((brandMatch = brandVariable.exec(css))) bump(brandMatch[2], 45);
+  const buttonishRules = rules.filter((rule) => /(^|[\s,>.])(btn|button|cta)\b/i.test(rule.selector));
+  buttonishRules.forEach((rule) => {
+    const pattern = /#[0-9a-f]{3,8}\b|rgba?\([^)]*\)|hsla?\([^)]*\)/gi;
+    let match;
+    while ((match = pattern.exec(rule.body))) bump(match[0], 10);
+  });
+
   /* colors */
   const found = new Map();
   const scan = (text, inCss) => {
@@ -437,10 +466,13 @@ export async function analyzeUrl(input) {
     if (distinct.length >= 24) break;
   }
 
-  const chromatic = distinct.filter((entry) => {
-    const { s, l } = colorInfo(entry.color);
-    return s > 0.2 && l > 0.04 && l < 0.96;
-  });
+  const colorScore = (entry) => entry.count + (colorBoost.get(entry.hex) ?? 0);
+  const chromatic = distinct
+    .filter((entry) => {
+      const { s, l } = colorInfo(entry.color);
+      return s > 0.2 && l > 0.04 && l < 0.96;
+    })
+    .sort((a, b) => colorScore(b) - colorScore(a));
   const neutrals = distinct.filter((entry) => !chromatic.includes(entry));
 
   const primaryEntry = chromatic[0] ?? distinct.find((entry) => colorInfo(entry.color).l < 0.55) ?? ranked[0];
@@ -562,6 +594,13 @@ export async function analyzeUrl(input) {
     if (px === null || px < 9 || px > 180) return;
     sizeCounts.set(px, (sizeCounts.get(px) ?? 0) + entry.count);
   });
+  const sizeVariable = /--[a-z0-9-]*(?:font-size|text-size|fs)[a-z0-9-]*\s*:\s*([^;}]+)/gi;
+  let sizeVarMatch;
+  while ((sizeVarMatch = sizeVariable.exec(css))) {
+    const px = toPx(sizeVarMatch[1]);
+    if (px === null || px < 9 || px > 180) continue;
+    sizeCounts.set(px, (sizeCounts.get(px) ?? 0) + 2);
+  }
   const sizes = Array.from(sizeCounts.entries())
     .sort((a, b) => b[0] - a[0])
     .slice(0, 8)
@@ -569,7 +608,7 @@ export async function analyzeUrl(input) {
 
   const headingSize = headingRule?.body.match(/font-size\s*:\s*([^;}]+)/i)?.[1];
   const headingPx = headingSize ? toPx(headingSize) : null;
-  const headingWeight = headingRule?.body.match(/font-weight\s*:\s*([^;}]+)/i)?.[1]?.trim() ?? '600';
+  const headingWeight = sanitizeWeight(headingRule?.body.match(/font-weight\s*:\s*([^;}]+)/i)?.[1], '600');
   const headingLineHeight = headingRule?.body.match(/line-height\s*:\s*([^;}]+)/i)?.[1]?.trim() ?? '1.08';
   const headingTracking = headingRule?.body.match(/letter-spacing\s*:\s*([^;}]+)/i)?.[1]?.trim() ?? '-0.03em';
 
@@ -661,10 +700,7 @@ export async function analyzeUrl(input) {
     .map(([value]) => value);
 
   /* buttons */
-  const buttonRules = rules.filter(
-    (rule) =>
-      /(^|[\s,>.])(btn|button|button-primary|cta)\b/i.test(rule.selector) && /background|border-radius/.test(rule.body),
-  );
+  const buttonRules = buttonishRules.filter((rule) => /background|border-radius/.test(rule.body));
   const buttons = buttonRules
     .map((rule) => ({
       background: rule.body.match(/background(?:-color|-image)?\s*:\s*([^;}]+)/i)?.[1]?.trim() ?? 'transparent',
@@ -767,7 +803,7 @@ export async function analyzeUrl(input) {
       cssBytes,
       rules: rules.length,
       colors: distinct.length,
-      fonts: rankedFonts.length,
+      fonts: Math.max(rankedFonts.length, fonts.length),
     },
     notes,
   };
