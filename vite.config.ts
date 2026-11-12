@@ -2,6 +2,8 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 // @ts-expect-error - plain ESM module shared with the production server
 import { analyzeUrl, AnalyzeError } from './server/analyze.mjs';
+// @ts-expect-error - plain ESM module, Node-only DNS guard
+import { verifyPublicHost } from './server/guard.mjs';
 
 function apiPlugin(): Plugin {
   return {
@@ -26,7 +28,7 @@ function apiPlugin(): Plugin {
           target = '';
         }
         try {
-          const result = await analyzeUrl(target);
+          const result = await analyzeUrl(target, { verifyHost: verifyPublicHost });
           res.statusCode = 200;
           res.setHeader('content-type', 'application/json; charset=utf-8');
           res.setHeader('cache-control', 'no-store');

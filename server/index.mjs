@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { analyzeUrl, AnalyzeError } from './analyze.mjs';
+import { verifyPublicHost } from './guard.mjs';
 
 const here = fileURLToPath(new URL('.', import.meta.url));
 const root = join(here, '..', 'dist');
@@ -51,7 +52,7 @@ const server = http.createServer(async (req, res) => {
       target = '';
     }
     try {
-      return json(res, 200, await analyzeUrl(target));
+      return json(res, 200, await analyzeUrl(target, { verifyHost: verifyPublicHost }));
     } catch (error) {
       const known = error instanceof AnalyzeError;
       return json(res, known ? error.status : 500, {

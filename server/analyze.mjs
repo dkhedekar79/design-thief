@@ -5,9 +5,6 @@
  * what the stylesheet declares rather than what the browser computes) and turns
  * those declarations into a compact design scheme.
  */
-import { lookup } from 'node:dns/promises';
-import net from 'node:net';
-
 const UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36 DesignThief/0.1 (+https://github.com/dkhedekar79/design-thief)';
 const MAX_HTML = 1_500_000;
@@ -32,9 +29,19 @@ export class AnalyzeError extends Error {
 
 /* ------------------------------------------------------------------ network */
 
-function isPrivateIp(ip) {
-  if (net.isIPv4(ip)) {
-    const [a, b] = ip.split('.').map(Number);
+/**
+ * Hostnames that must never be fetched. Works without Node: DNS resolution is
+ * layered on top by the Node server, while Workers cannot resolve private IPs.
+ */
+function isBlockedHost(hostname) {
+  const host = String(hostname).toLowerCase().replace(/^\[|\]$/g, '');
+  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
+    return true;
+  }
+  const ipv4 = host.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4) {
+    const a = Number(ipv4[1]);
+    const b = Number(ipv4[2]);
     if (a === 10 || a === 127 || a === 0) return true;
     if (a === 169 && b === 254) return true;
     if (a === 172 && b >= 16 && b <= 31) return true;
@@ -42,34 +49,18 @@ function isPrivateIp(ip) {
     if (a === 100 && b >= 64 && b <= 127) return true;
     return false;
   }
-  if (net.isIPv6(ip)) {
-    const value = ip.toLowerCase();
-    if (value === '::1' || value === '::') return true;
-    if (value.startsWith('fe80') || value.startsWith('fc') || value.startsWith('fd')) return true;
-    if (value.startsWith('::ffff:')) return isPrivateIp(value.slice(7));
-    return false;
+  if (host.includes(':')) {
+    if (host === '::1' || host === '::') return true;
+    if (/^f[cd][0-9a-f]{2}:/.test(host) || /^fe80:/.test(host)) return true;
+    const mapped = host.match(/^::ffff:(\d+\.\d+\.\d+\.\d+)$/);
+    if (mapped) return isBlockedHost(mapped[1]);
   }
   return false;
 }
 
-async function assertPublicHost(hostname) {
-  const host = hostname.toLowerCase();
-  if (net.isIP(host)) {
-    if (isPrivateIp(host)) throw new AnalyzeError('Local and private addresses are blocked.', 403);
-    return;
-  }
-  if (host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal')) {
-    throw new AnalyzeError('Local and private addresses are blocked.', 403);
-  }
-  let addresses;
-  try {
-    addresses = await lookup(host, { all: true, verbatim: true });
-  } catch {
-    throw new AnalyzeError(`We could not resolve ${host}. Check the address and try again.`, 422);
-  }
-  if (addresses.some((entry) => isPrivateIp(entry.address))) {
-    throw new AnalyzeError('Local and private addresses are blocked.', 403);
-  }
+async function assertPublicHost(hostname, verifyHost) {
+  if (isBlockedHost(hostname)) throw new AnalyzeError('Local and private addresses are blocked.', 403);
+  if (verifyHost) await verifyHost(hostname);
 }
 
 function normalizeUrl(input) {
@@ -88,20 +79,24 @@ function normalizeUrl(input) {
   return url;
 }
 
-async function fetchText(startUrl, limit, accept) {
+async function fetchText(startUrl, limit, accept, verifyHost) {
   let current = startUrl;
   for (let hop = 0; hop < 5; hop += 1) {
     const url = new URL(current);
-    await assertPublicHost(url.hostname);
+    await assertPublicHost(url.hostname, verifyHost);
     let response;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
     try {
       response = await fetch(url, {
         redirect: 'manual',
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: controller.signal,
         headers: { 'user-agent': UA, accept, 'accept-language': 'en-GB,en;q=0.9' },
       });
     } catch {
       throw new AnalyzeError(`Could not reach ${url.hostname}. It may block automated requests.`, 422);
+    } finally {
+      clearTimeout(timer);
     }
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get('location');
@@ -129,8 +124,14 @@ async function fetchText(startUrl, limit, accept) {
       }
       chunks.push(value);
     }
-    const buffer = Buffer.concat(chunks.map((chunk) => Buffer.from(chunk)));
-    return { url: current, text: buffer.toString('utf8'), bytes: buffer.length, contentType };
+    const total = chunks.reduce((size, chunk) => size + chunk.byteLength, 0);
+    const bytesArray = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytesArray.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return { url: current, text: new TextDecoder().decode(bytesArray), bytes: total, contentType };
   }
   throw new AnalyzeError('That site redirected too many times.', 422);
 }
@@ -360,9 +361,10 @@ function detectFramework(html) {
   return null;
 }
 
-export async function analyzeUrl(input) {
+export async function analyzeUrl(input, options = {}) {
+  const verifyHost = typeof options.verifyHost === 'function' ? options.verifyHost : null;
   const url = normalizeUrl(input);
-  const page = await fetchText(url.toString(), MAX_HTML, 'text/html,application/xhtml+xml');
+  const page = await fetchText(url.toString(), MAX_HTML, 'text/html,application/xhtml+xml', verifyHost);
   if (page.contentType && !/html|xml/i.test(page.contentType)) {
     throw new AnalyzeError('That address did not return a web page.', 422);
   }
@@ -397,7 +399,7 @@ export async function analyzeUrl(input) {
     uniqueSheets.map(async (href) => {
       if (cssBytes > MAX_CSS_TOTAL) return;
       try {
-        const sheet = await fetchText(href, MAX_CSS_EACH, 'text/css,*/*;q=0.1');
+        const sheet = await fetchText(href, MAX_CSS_EACH, 'text/css,*/*;q=0.1', verifyHost);
         if (!/css|text\/plain/i.test(sheet.contentType) && !/[{]/.test(sheet.text)) return;
         cssBytes += sheet.bytes;
         sheets.push(sheet.text);

@@ -1,5 +1,6 @@
 node_modules
 dist
+worker-dist
 .DS_Store
 *.local
 ref/
@@ -9,3 +10,7 @@ pythe.css
 .dev.pid
 .prod.log
 .prod.pid
+.sites.json
+.wr.log
+.wr.pid
+.wrangler/
