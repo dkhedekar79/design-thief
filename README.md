@@ -1,5 +1,7 @@
 # Design Thief
 
+[Live demo](https://site-1ebaf9f8ab2d4edb99442ba70908028e.freebuff.page) · [GitHub](https://github.com/dkhedekar79/design-thief) · MIT licensed
+
 A one-page, open-source design system extractor. Give it any public URL and it reads the
 site's own stylesheets, then hands back either:
 
@@ -71,10 +73,21 @@ reference: learn a visual language, or build something in the same spirit. Do no
 another company's logo, wordmark, photography, illustrations or copy. The generated prompt
 tells the model to leave those out. Check the licence of any font before shipping it.
 
+## Deploying
+
+`npm run build` emits the SPA into `dist/` and bundles the extractor into
+`worker-dist/worker.js`. `deploy.json` is a static-assets Worker manifest: the Worker answers
+`/api/analyze` and hands everything else to `env.ASSETS`. Any static host with a serverless
+function can run it the same way; the extractor itself uses only Web APIs.
+
+On Node the server additionally resolves each hostname and refuses private addresses. The
+Worker relies on the platform's network isolation for that check.
+
 ## Stack
 
 Vite + React + TypeScript for the page, two small Node ESM modules for extraction and
-serving. No component library, no CSS framework, no runtime dependencies beyond React.
+serving, and a thin Worker entry for hosting. No component library, no CSS framework, no
+runtime dependencies beyond React.
 
 ## Licence
 
