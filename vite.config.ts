@@ -44,5 +44,14 @@ function apiPlugin(): Plugin {
 
 export default defineConfig({
   plugins: [react(), apiPlugin()],
-  server: { port: 3000, strictPort: false },
+  server: {
+    host: '0.0.0.0',
+    port: 3000,
+    strictPort: false,
+    // Extra hostnames (comma separated) for tunnelled previews; unset locally.
+    allowedHosts: (process.env.ALLOWED_HOSTS ?? '')
+      .split(',')
+      .map((host) => host.trim())
+      .filter(Boolean),
+  },
 });
