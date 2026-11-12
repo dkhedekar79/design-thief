@@ -41,6 +41,7 @@ export default function Faq() {
       <div className="container">
         <div className="section-head faq-head">
           <div>
+            <p className="eyebrow">FAQ</p>
             <h2 className="section-title">Questions.</h2>
             <p className="section-lede">What it reads, what it will not do, and how to use it fairly.</p>
           </div>

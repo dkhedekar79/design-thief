@@ -631,8 +631,14 @@ export async function analyzeUrl(input) {
       tracking: headingTracking,
     });
   }
+  // A page whose largest declared size is small is using variables or classes for
+  // headings; neutral labels avoid claiming a 16px "Display" step.
+  const scaleLabels =
+    (typeScale[0]?.px ?? 0) >= 32
+      ? labels
+      : ['Large', 'Medium', 'Base', 'Small', 'Smaller', 'Caption', 'Micro', 'Tiny'];
   typeScale.forEach((entry, index) => {
-    entry.label = labels[index] ?? `Size ${index + 1}`;
+    entry.label = scaleLabels[index] ?? `Size ${index + 1}`;
   });
 
   /* radii, shadows, gradients, spacing */
