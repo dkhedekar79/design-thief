@@ -1883,8 +1883,16 @@ ol {
     flex-direction: column;
   }
 
-  .brand-tag {
+  .brand-tag,
+  .nav-menu {
     display: none;
+  }
+
+  .nav-cta {
+    height: 40px;
+    padding: 0 15px;
+    font-size: 13.5px;
+    white-space: nowrap;
   }
 }
 
